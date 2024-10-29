@@ -9,9 +9,12 @@ class nxcPowerContent {
 
 	private $cli = false;
 
-	public function __construct( $cli = false ) {
+	private $rest = false;
+
+	public function __construct( $cli = false, $rest = false ) {
 		$this->db  = eZDB::instance();
 		$this->cli = $cli;
+		$this->rest = $rest;
 	}
 
 	/**
@@ -75,7 +78,7 @@ class nxcPowerContent {
 		$versionStatus  = ( isset( $params['versionStatus'] ) ) ? $params['versionStatus'] : eZContentObjectVersion::STATUS_PUBLISHED;
 		$visibility     = ( isset( $params['visibility'] ) ) ? (bool) $params['visibility'] : true;
 
-		if( $remoteID ) {
+		if( $remoteID !== false ) {
 			$object = eZContentObject::fetchByRemoteID( $remoteID );
 			if( $object instanceof eZContentObject ) {
 				$this->db->rollback();
@@ -99,7 +102,9 @@ class nxcPowerContent {
 				'contentobject_id'      => $object->attribute( 'id' ),
 				'contentobject_version' => $object->attribute( 'current_version' ),
 				'parent_node'           => $parentNode->attribute( 'node_id' ),
-				'is_main'               => 1
+				'is_main'               => 1,
+				'sort_field' => $class->attribute( 'sort_field' ),
+				'sort_order' => $class->attribute( 'sort_order' )
 			)
 		);
 		$nodeAssignment->store();
@@ -108,6 +113,10 @@ class nxcPowerContent {
 		$version->setAttribute( 'modified', $publishDate );
 		$version->setAttribute( 'status', $versionStatus );
 		$version->store();
+
+		// return var_dump( $params['attributes']); die();
+		//$this->debug("Attribute-Set:\n\n");
+		//$this->debug( $this->setObjectAttributes( $object, $params['attributes'] ) );
 
 		$this->setObjectAttributes( $object, $params['attributes'] );
 
@@ -125,15 +134,15 @@ class nxcPowerContent {
 
 		$object->commitInputRelations( $object->attribute( 'current_version' ) );
 		$object->resetInputRelationList();
-		eZOperationHandler::execute(
-			'content',
-			'publish',
-			array(
-				'object_id' => $object->attribute( 'id' ),
-				'version'   => $object->attribute( 'current_version' )
-			)
-		);
 
+		$pathResult = eZModule::addGlobalPathList( array( 'kernel', 'extension/nxc_powercontent' ) );
+		$contentModule = eZModule::findModule( 'content', null, array( 'kernel', 'extension/nxc_powercontent' ) );
+		// return var_dump($contentModule); die();
+
+		$operationResult = eZOperationHandler::execute( 'content', 'publish', array( 'object_id' => $object->attribute( 'id' ),
+                                                                                             'version' => $version->attribute( 'version' ) ) );
+                //var_dump( $operationResult );
+		
 		$this->db->commit();
 
 		if( $visibility === false ) {
@@ -283,6 +292,7 @@ class nxcPowerContent {
 	 * @return bool true if object was removed, otherwise false
 	 */
 	public function removeObject( eZContentObject $object ) {
+	        $ret = false;
 		$objectName = $object->attribute( 'name' );
 		$this->debug( 'Removing "' . $objectName . '" object (class: ' . $object->attribute( 'class_name' ) . ') with remote ID ' . $object->attribute( 'remote_id' ) );
 
@@ -295,7 +305,7 @@ class nxcPowerContent {
 			$object->purge();
 			$this->db->commit();
 			$this->debug( '[Removed] "' . $objectName . '"' );
-			return true;
+			$ret = true;
 		} else {
 			$removeNodeIDs = array( $object->attribute( 'main_node' )->attribute( 'node_id' ) );
 
@@ -322,9 +332,10 @@ class nxcPowerContent {
 			}
 
 			$this->db->commit();
+			$ret = true;
 		}
 
-		return false;
+		return $ret;
 	}
 
 	/**
@@ -465,10 +476,12 @@ class nxcPowerContent {
 	 * @param string $message Error message
 	 * @return void
 	 */
-	private function error( $message ) {
+	public function error( $message ) {
 		if( $this->cli instanceof eZCLI ) {
 			$string = $this->cli->stylize( 'error', $message );
 			$this->cli->output( $string );
+		} elseif( $this->rest == true ) {
+			throw new ezpContentFieldNotFoundException( $message );
 		} else {
 			eZDebug::writeError( $message, 'NXC PowerContent' );
 		}
@@ -482,7 +495,7 @@ class nxcPowerContent {
 	 * @param array $styles CLI styles
 	 * @return void
 	 */
-	private function debug( $message, array $styles = array( 'white' ) ) {
+	public function debug( $message, array $styles = array( 'white' ) ) {
 		if( $this->cli instanceof eZCLI ) {
 			foreach( $styles as $style ) {
 				$message = $this->cli->stylize( $style, $message );
