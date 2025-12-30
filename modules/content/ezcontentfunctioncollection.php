@@ -1158,7 +1158,7 @@ class eZContentFunctionCollection
     }
 
     // Fetches related objects id grouped by relation types
-    static public function fetchRelatedObjectsID( $objectID, $attributeID, $allRelations)
+    static public function fetchRelatedObjectsID( $objectID, $attributeID, $allRelations )
     {
         if ( !is_array( $allRelations ) || $allRelations === array() )
         {
@@ -1238,7 +1238,7 @@ class eZContentFunctionCollection
      * @param array $relatedClassIdentifiers Array of related class identifiers that will be accepted
      * @return array ANn array of eZContentObject
      */
-    static public function fetchRelatedObjects( $objectID, $attributeID, $allRelations, $groupByAttribute, $sortBy, $limit = false, $offset = false, $asObject = true, $loadDataMap = false, $ignoreVisibility = null, array $relatedClassIdentifiers = null )
+    static public function fetchRelatedObjects( $objectID, $attributeID, $allRelations, $groupByAttribute, $sortBy, $limit = false, $offset = false, $asObject = true, $loadDataMap = false, $ignoreVisibility = null, ?array $relatedClassIdentifiers = null )
     {
         if ( !is_numeric( $objectID ) )
         {
