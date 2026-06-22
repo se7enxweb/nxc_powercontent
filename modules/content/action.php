@@ -1056,6 +1056,167 @@ else if ( $http->hasPostVariable( 'MoveButton' ) )
         $module->redirectTo( $module->functionURI( 'view' ) . '/' . $viewMode . '/' . $parentNodeID . '/' );
     }
 }
+else if ( $http->hasPostVariable( 'CopyButton' ) )
+{
+    /* action for multi select copy, uses same interface as MoveButton */
+    $viewMode = $http->postVariable( 'ViewMode', 'full' );
+
+    $parentNodeID = $http->postVariable( 'ContentNodeID', 2 );
+    $parentObjectID = $http->postVariable( 'ContentObjectID', 1 );
+
+    if ( $http->hasPostVariable( 'DeleteIDArray' ) or $http->hasPostVariable( 'SelectedIDArray' ) )
+    {
+        if ( $http->hasPostVariable( 'SelectedIDArray' ) )
+            $copyIDArray = $http->postVariable( 'SelectedIDArray' );
+        else
+            $copyIDArray = $http->postVariable( 'DeleteIDArray' );
+
+        if ( is_array( $copyIDArray ) && count( $copyIDArray ) > 0 )
+        {
+            $ignoreNodesSelect = array();
+            $ignoreNodesSelectSubtree = array();
+            $ignoreNodesClick = array();
+            $classIDArray = array();
+            $classIdentifierArray = array();
+            $classGroupArray = array();
+            $sectionIDArray = array();
+            $objectNameArray = array();
+
+            foreach( $copyIDArray as $nodeID )
+            {
+                $node = eZContentObjectTreeNode::fetch( $nodeID );
+                if ( !$node )
+                    return $module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel', array() );
+
+                if ( !$node->canCreate() )
+                    return $module->handleError( eZError::KERNEL_ACCESS_DENIED, 'kernel', array() );
+
+                $object = $node->object();
+                if ( !$object )
+                    return $module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel', array() );
+
+                $class = $object->contentClass();
+
+                $classIDArray[] = $class->attribute( 'id' );
+                $classIdentifierArray[] = $class->attribute( 'identifier' );
+                $classGroupArray = array_merge( $classGroupArray, $class->attribute( 'ingroup_id_list' ) );
+                $sectionIDArray[] = $object->attribute( 'section_id' );
+                $objectNameArray[] = $object->attribute( 'name' );
+
+                $publishedAssigned = $object->assignedNodes( false );
+                foreach ( $publishedAssigned as $element )
+                {
+                    $ignoreNodesSelect[] = $element['node_id'];
+                    $ignoreNodesSelectSubtree[] = $element['node_id'];
+                    $ignoreNodesClick[]  = $element['node_id'];
+                    $ignoreNodesSelect[] = $element['parent_node_id'];
+                }
+            }
+
+            $parentNode = eZContentObjectTreeNode::fetch( $parentNodeID );
+            if ( !$parentNode )
+                return $module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel', array() );
+
+            $parentObject = $parentNode->object();
+            if ( !$parentObject )
+                return $module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel', array() );
+            $parentObjectID = $parentObject->attribute( 'id' );
+
+            $ignoreNodesSelect = array_unique( $ignoreNodesSelect );
+            $ignoreNodesSelectSubtree = array_unique( $ignoreNodesSelectSubtree );
+            $ignoreNodesClick = array_unique( $ignoreNodesClick );
+
+            $classIDArray = array_unique( $classIDArray );
+            $classIdentifierArray = array_unique( $classIdentifierArray );
+            $classGroupArray = array_unique( $classGroupArray );
+            $sectionIDArray = array_unique( $sectionIDArray );
+
+            eZContentBrowse::browse( array( 'action_name' => 'CopyNode',
+                                            'description_template' => 'design:content/browse_copy_subtrees.tpl',
+                                            'keys' => array( 'class' => $classIDArray,
+                                                             'class_id' => $classIdentifierArray,
+                                                             'classgroup' => $classGroupArray,
+                                                             'section' => $sectionIDArray ),
+                                            'ignore_nodes_select' => $ignoreNodesSelect,
+                                            'ignore_nodes_select_subtree' => $ignoreNodesSelectSubtree,
+                                            'ignore_nodes_click'  => $ignoreNodesClick,
+                                            'persistent_data' => array( 'ContentNodeID' => implode( ',', $copyIDArray ),
+                                                                        'ViewMode' => $viewMode,
+                                                                        'ContentObjectLanguageCode' => $languageCode,
+                                                                        'CopyNodeAction' => '1' ),
+                                            'permission' => array( 'access' => 'create',
+                                                                   'contentclass_id' => $classIDArray ),
+                                            'content' => array( 'name_list' => $objectNameArray, 'node_id_list' => $copyIDArray ),
+                                            'start_node' => $parentNodeID,
+                                            'cancel_page' => $module->redirectionURIForModule( $module, 'view', array( $viewMode, $parentNodeID, $languageCode ) ),
+                                            'from_page' => "/content/action" ),
+                                     $module );
+        }
+        else
+        {
+            eZDebug::writeError( "Empty SelectedIDArray parameter for action " . $module->currentAction(),
+                                 'content/action' );
+            $module->redirectTo( $module->functionURI( 'view' ) . '/' . $viewMode . '/' . $parentNodeID . '/' );
+        }
+    }
+    else
+    {
+        eZDebug::writeError( "Missing SelectedIDArray parameter for action " . $module->currentAction(),
+                             'content/action' );
+        $module->redirectTo( $module->functionURI( 'view' ) . '/' . $viewMode . '/' . $parentNodeID . '/' );
+    }
+}
+else if ( $http->hasPostVariable( 'HideButton' ) || $http->hasPostVariable( 'UnhideButton' ) )
+{
+    $viewMode = $http->postVariable( 'ViewMode', 'full' );
+    $parentNodeID = $http->postVariable( 'ContentNodeID', 2 );
+    $hideSelected = $http->hasPostVariable( 'HideButton' );
+
+    if ( $http->hasPostVariable( 'DeleteIDArray' ) or $http->hasPostVariable( 'SelectedIDArray' ) )
+    {
+        if ( $http->hasPostVariable( 'SelectedIDArray' ) )
+            $nodeIDArray = $http->postVariable( 'SelectedIDArray' );
+        else
+            $nodeIDArray = $http->postVariable( 'DeleteIDArray' );
+
+        if ( is_array( $nodeIDArray ) && count( $nodeIDArray ) > 0 )
+        {
+            foreach ( $nodeIDArray as $nodeID )
+            {
+                $node = eZContentObjectTreeNode::fetch( $nodeID );
+                if ( !$node )
+                    return $module->handleError( eZError::KERNEL_NOT_AVAILABLE, 'kernel', array() );
+
+                if ( !$node->attribute( 'can_hide' ) )
+                    return $module->handleError( eZError::KERNEL_ACCESS_DENIED, 'kernel', array() );
+
+                $isHidden = (bool)$node->attribute( 'is_hidden' );
+                if ( ( $hideSelected && $isHidden ) || ( !$hideSelected && !$isHidden ) )
+                    continue;
+
+                if ( eZOperationHandler::operationIsAvailable( 'content_hide' ) )
+                {
+                    $operationResult = eZOperationHandler::execute( 'content',
+                                                                    'hide',
+                                                                    array( 'node_id' => $nodeID ),
+                                                                    null,
+                                                                    true );
+                }
+                else
+                {
+                    eZContentOperationCollection::changeHideStatus( $nodeID );
+                }
+            }
+        }
+    }
+
+    if ( $languageCode !== false )
+    {
+        return $module->redirectToView( 'view', array( $viewMode, $parentNodeID, $languageCode ) );
+    }
+
+    return $module->redirectToView( 'view', array( $viewMode, $parentNodeID ) );
+}
 else if ( $http->hasPostVariable( 'UpdatePriorityButton' ) )
 {
     $viewMode = $http->postVariable( 'ViewMode', 'full' );
