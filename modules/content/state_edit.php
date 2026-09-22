@@ -6,14 +6,20 @@
  * @package kernel
  */
 
+
+if ( !function_exists( 'stateEditPostFetch' ) ) {
 function stateEditPostFetch( $module, $class, $object, $version, $contentObjectAttributes, $editVersion, $editLanguage, $fromLanguage, &$validation )
 {
 }
+}
 
+if ( !function_exists( 'stateEditPreCommit' ) ) {
 function stateEditPreCommit( $module, $class, $object, $version, $contentObjectAttributes, $editVersion, $editLanguage )
 {
 }
+}
 
+if ( !function_exists( 'stateEditActionCheck' ) ) {
 function stateEditActionCheck( $module, $class, $object, $version, $contentObjectAttributes, $editVersion, $editLanguage, $fromLanguage )
 {
     if ( $module->isCurrentAction( 'StateEdit' ) )
@@ -38,11 +44,15 @@ function stateEditActionCheck( $module, $class, $object, $version, $contentObjec
         }
     }
 }
+}
 
+if ( !function_exists( 'stateEditPreTemplate' ) ) {
 function stateEditPreTemplate( $module, $class, $object, $version, $contentObjectAttributes, $editVersion, $editLanguage, $tpl )
 {
 }
+}
 
+if ( !function_exists( 'initializeStateEdit' ) ) {
 function initializeStateEdit( $module )
 {
     $module->addHook( 'post_fetch', 'stateEditPostFetch' );
@@ -50,5 +60,11 @@ function initializeStateEdit( $module )
     $module->addHook( 'action_check', 'stateEditActionCheck' );
     $module->addHook( 'pre_template', 'stateEditPreTemplate' );
 }
+}
+
+
+
+
+
 
 ?>

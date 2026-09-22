@@ -14,6 +14,8 @@
 
 */
 
+
+if ( !class_exists( 'eZContentFunctionCollection', false ) ) {
 class eZContentFunctionCollection
 {
     static public function fetchContentObject( $objectID, $remoteID = false )
@@ -1556,5 +1558,7 @@ class eZContentFunctionCollection
         return array( 'result' => $expiryHandler->timestamp( 'content-tree-menu' ) );
     }
 }
+}
+
 
 ?>
