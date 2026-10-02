@@ -9,7 +9,7 @@ class nxc_powercontentInfo {
 	public static function info() {
 		return array(
 			'Name'      => 'NXC Powercontent',
-			'Version'   => '1.1.0',
+			'Version'   => '1.4.1',
 			'Author'    => '7x / SD / NXC International SA',
 			'Copyright' => 'Copyright 1999 - 2024 7x and 2010 <a href="http://nxc.no" target="blank">NXC Consulting</a>'
 		);
