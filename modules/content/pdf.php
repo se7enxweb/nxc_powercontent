@@ -190,7 +190,7 @@ $viewParameters = array_merge( $viewParameters, $UserParameters );
 if ( $viewCacheEnabled && ( $useTriggers == false ) )
 {
     // Note: this code is duplicate, see about 100 lines down
-    $cacheInfo = eZContentObject::cacheInfo( $Params );
+    $cacheInfo = ( new eZContentObject( array() ) )->cacheInfo( $Params );
     $language = $cacheInfo['language'];
     $roleList = $cacheInfo['role_list'];
     $discountList = $cacheInfo['discount_list'];
@@ -228,7 +228,7 @@ switch( $operationResult['status'] )
             if ( $viewCacheEnabled )
             {
                 // Note: this code is duplicate, see about 100 lines up
-                $cacheInfo = eZContentObject::cacheInfo( $Params );
+                $cacheInfo = ( new eZContentObject( array() ) )->cacheInfo( $Params );
                 $language = $cacheInfo['language'];
                 $roleList = $cacheInfo['role_list'];
                 $discountList = $cacheInfo['discount_list'];
