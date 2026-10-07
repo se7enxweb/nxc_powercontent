@@ -7,6 +7,9 @@
 
 class nxcPowerContent {
 
+	/** @var eZDBInterface the database every create, update and remove runs in */
+	protected $db;
+
 	private $cli = false;
 
 	private $rest = false;
