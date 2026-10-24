@@ -106,30 +106,21 @@ if ( $http->hasPostVariable( 'SendButton' ) )
     // as "a' -X/tmp/x.php '"@example.com (CVE-2016-10033 pattern). The visitor goes into Reply-To.
     if ( $fromEmail == null )
     {
-        $siteSenderClass = 'Exponential\\View\\Kernel\\Content\\Tipafriend';
-        if ( class_exists( $siteSenderClass ) && method_exists( $siteSenderClass, 'siteSender' ) )
+        foreach ( array( 'EmailSender', 'AdminEmail' ) as $senderSetting )
         {
-            $fromEmail = $siteSenderClass::siteSender( $ini );
-        }
-        else
-        {
-            foreach ( array( 'EmailSender', 'AdminEmail' ) as $senderSetting )
+            $senderText = $ini->hasVariable( 'MailSettings', $senderSetting ) ? $ini->variable( 'MailSettings', $senderSetting ) : '';
+            if ( !is_string( $senderText ) || trim( $senderText ) === '' )
+                continue;
+            $senderAddress = null;
+            $senderName = null;
+            eZMail::extractEmail( trim( $senderText ), $senderAddress, $senderName );
+            if ( is_string( $senderAddress ) && eZMail::validate( $senderAddress ) )
             {
-                $senderText = $ini->hasVariable( 'MailSettings', $senderSetting ) ? $ini->variable( 'MailSettings', $senderSetting ) : '';
-                if ( !is_string( $senderText ) || trim( $senderText ) === '' )
-                    continue;
-                $senderAddress = null;
-                $senderName = null;
-                eZMail::extractEmail( trim( $senderText ), $senderAddress, $senderName );
-                if ( is_string( $senderAddress ) && eZMail::validate( $senderAddress ) )
-                {
-                    $fromEmail = $senderAddress;
-                    break;
-                }
+                $fromEmail = $senderAddress;
+                break;
             }
-            unset( $senderSetting, $senderText, $senderAddress, $senderName );
         }
-        unset( $siteSenderClass );
+        unset( $senderSetting, $senderText, $senderAddress, $senderName );
     }
     // Only when the site has no valid sender address at all, the visitor's address is used as before,
     // and then only in a plain form that cannot carry sendmail options.
@@ -139,8 +130,9 @@ if ( $http->hasPostVariable( 'SendButton' ) )
             $fromEmail = $yourEmail;
         else if ( count( $error_strings ) == 0 )
         {
+            // a misconfiguration of the site, not a mistake of the visitor: the form says so
             eZDebug::writeError( 'Neither [TipAFriend] FromEmail nor [MailSettings] EmailSender/AdminEmail in site.ini is a valid address, and the visitor address is not used as sender', 'tipafriend' );
-            $error_strings[] = ezpI18n::tr( 'kernel/content', 'The email address of the sender is not valid' );
+            $error_strings[] = ezpI18n::tr( 'kernel/content', 'The site has no valid sender address configured, so the message cannot be sent. Please tell the site administrator.' );
         }
     }
 
