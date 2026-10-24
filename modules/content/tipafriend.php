@@ -75,6 +75,13 @@ if ( $http->hasPostVariable( 'SendButton' ) )
     if ( $http->hasPostVariable( 'Comment' ) )
         $comment = $http->variable( 'Comment' );
 
+    // Values that end up in mail headers must not carry line breaks or NUL bytes (header injection).
+    foreach ( array( 'yourName', 'yourEmail', 'receiversName', 'receiversEmail', 'subject' ) as $headerValueName )
+    {
+        $$headerValueName = is_string( $$headerValueName ) ? trim( str_replace( array( "\r", "\n", "\0" ), ' ', $$headerValueName ) ) : '';
+    }
+    unset( $headerValueName );
+
     // email validation
     if ( !eZMail::validate( $yourEmail ) )
         $error_strings[] = ezpI18n::tr( 'kernel/content', 'The email address of the sender is not valid' );
@@ -93,8 +100,49 @@ if ( $http->hasPostVariable( 'SendButton' ) )
                 $fromEmail = null;
             }
     }
+    // Without [TipAFriend] FromEmail the mail is sent with the site's own address (the first valid one of
+    // [MailSettings] EmailSender and AdminEmail), not with the visitor's address: the sender address is
+    // passed to sendmail as envelope sender (-f), and eZMail::validate() accepts quoted local parts such
+    // as "a' -X/tmp/x.php '"@example.com (CVE-2016-10033 pattern). The visitor goes into Reply-To.
     if ( $fromEmail == null )
-        $fromEmail = $yourEmail;
+    {
+        $siteSenderClass = 'Exponential\\View\\Kernel\\Content\\Tipafriend';
+        if ( class_exists( $siteSenderClass ) && method_exists( $siteSenderClass, 'siteSender' ) )
+        {
+            $fromEmail = $siteSenderClass::siteSender( $ini );
+        }
+        else
+        {
+            foreach ( array( 'EmailSender', 'AdminEmail' ) as $senderSetting )
+            {
+                $senderText = $ini->hasVariable( 'MailSettings', $senderSetting ) ? $ini->variable( 'MailSettings', $senderSetting ) : '';
+                if ( !is_string( $senderText ) || trim( $senderText ) === '' )
+                    continue;
+                $senderAddress = null;
+                $senderName = null;
+                eZMail::extractEmail( trim( $senderText ), $senderAddress, $senderName );
+                if ( is_string( $senderAddress ) && eZMail::validate( $senderAddress ) )
+                {
+                    $fromEmail = $senderAddress;
+                    break;
+                }
+            }
+            unset( $senderSetting, $senderText, $senderAddress, $senderName );
+        }
+        unset( $siteSenderClass );
+    }
+    // Only when the site has no valid sender address at all, the visitor's address is used as before,
+    // and then only in a plain form that cannot carry sendmail options.
+    if ( $fromEmail == null )
+    {
+        if ( preg_match( '/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/D', $yourEmail ) )
+            $fromEmail = $yourEmail;
+        else if ( count( $error_strings ) == 0 )
+        {
+            eZDebug::writeError( 'Neither [TipAFriend] FromEmail nor [MailSettings] EmailSender/AdminEmail in site.ini is a valid address, and the visitor address is not used as sender', 'tipafriend' );
+            $error_strings[] = ezpI18n::tr( 'kernel/content', 'The email address of the sender is not valid' );
+        }
+    }
 
     if ( $http->hasSessionVariable('ezpContentTipafriendList') )
     {
@@ -110,6 +158,8 @@ if ( $http->hasPostVariable( 'SendButton' ) )
     {
         $mail = new eZMail();
         $mail->setSender( $fromEmail, $yourName );
+        if ( $fromEmail !== $yourEmail )
+            $mail->setReplyTo( $yourEmail, $yourName );
         $mail->setReceiver( $receiversEmail, $receiversName );
         $mail->setSubject( $subject );
 
