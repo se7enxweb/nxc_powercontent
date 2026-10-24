@@ -122,6 +122,10 @@ if ( $http->hasPostVariable( 'SendButton' ) )
         }
         unset( $senderSetting, $senderText, $senderAddress, $senderName );
     }
+    // Whether the sender address is the site's, decided here and not by comparing with the visitor's input:
+    // a visitor who typed the site's own address as YourEmail must not get their free-text name shown in
+    // front of it ("Bank support <site address>"). The site's name is used instead.
+    $fromIsSite = $fromEmail != null;
     // Only when the site has no valid sender address at all, the visitor's address is used as before,
     // and then only in a plain form that cannot carry sendmail options.
     if ( $fromEmail == null )
@@ -149,8 +153,14 @@ if ( $http->hasPostVariable( 'SendButton' ) )
     if ( count( $error_strings ) == 0 )
     {
         $mail = new eZMail();
-        $mail->setSender( $fromEmail, $yourName );
-        if ( $fromEmail !== $yourEmail )
+        $senderDisplayName = $yourName;
+        if ( $fromIsSite )
+        {
+            $siteName = $ini->hasVariable( 'SiteSettings', 'SiteName' ) ? $ini->variable( 'SiteSettings', 'SiteName' ) : '';
+            $senderDisplayName = is_string( $siteName ) ? trim( preg_replace( '/[\\x00-\\x1F\\x7F"]+/', ' ', $siteName ) ) : '';
+        }
+        $mail->setSender( $fromEmail, $senderDisplayName );
+        if ( $fromIsSite )
             $mail->setReplyTo( $yourEmail, $yourName );
         $mail->setReceiver( $receiversEmail, $receiversName );
         $mail->setSubject( $subject );
