@@ -12,6 +12,9 @@
  *          (a new draft can have the number of the discarded one)
  *  DC-03 - DiscardConfirm=1: the confirmation page, nothing discarded; the posted ConfirmButton then discards
  *  DC-04 - no DiscardConfirm at all: the confirmation page
+ *  DC-05 - the kernel's edit check of the version decides: without edit access (and no create access for a draft
+ *          that was never published) the version stays and access is denied
+ *  DC-06 - RedirectIfDiscarded is followed only when eZRedirectManager::returnURI() accepts it
  */
 
 $failures = 0;
@@ -72,7 +75,11 @@ class eZContentObject
         return $values[$name];
     }
     public function canEdit() { return true; }
-    public function editAccess( $version = null ) { return true; }
+    public static $editAccess = true;
+    public static $draftCreateAccess = null;
+    public function editAccess( $version = null ) { DcLog::add( 'editAccess:' . ( $version instanceof eZContentObjectVersion ? 'version' : 'none' ) ); return self::$editAccess; }
+    public function draftCreateAccess() { DcLog::add( 'draftCreateAccess' ); return self::$draftCreateAccess; }
+    public function accessList( $function ) { return array(); }
     public function getVersionCount() { return 3; }
 }
 
@@ -89,7 +96,12 @@ class eZContentObjectVersion
 class eZRedirectManager
 {
     public static function redirectTo( $module, $default, $view = true, $disallowed = false ) { $module->redirectTo( $default ); return true; }
-    public static function returnURI( $module, $default, $preferred = false, $options = array() ) { return $default; }
+    public static function returnURI( $module, $default, $preferred = false, $options = array() )
+    {
+        DcLog::add( 'returnURI:' . $preferred );
+        // stand-in for the rules of the kernel: a path inside the site only
+        return is_string( $preferred ) && preg_match( '#^/(?!/)#', $preferred ) ? $preferred : $default;
+    }
 }
 
 class eZError { const KERNEL_NOT_AVAILABLE = 3; const KERNEL_ACCESS_DENIED = 1; }
@@ -157,6 +169,33 @@ dcCheck( DcLog::has( 'versionRemoved' ), 'DC-03 the posted ConfirmButton discard
 dcDiscard( null );
 dcRun();
 dcCheck( !DcLog::has( 'versionRemoved' ) && DcLog::has( $asks ), 'DC-04 no DiscardConfirm: the confirmation page' );
+
+// DC-05
+dcDiscard( false );
+eZContentObject::$editAccess = false;
+eZContentObject::$draftCreateAccess = 0;
+$module = dcRun();
+dcCheck( !DcLog::has( 'versionRemoved' ) && DcLog::has( 'editAccess:version' ) && DcLog::has( 'draftCreateAccess' )
+         && DcLog::has( 'error:kernel:1' ),
+         'DC-05 no edit access to the version: access denied, nothing discarded (' . DcLog::text() . ')' );
+dcDiscard( false );
+eZContentObject::$draftCreateAccess = 1;
+dcRun();
+dcCheck( DcLog::has( 'versionRemoved' ), 'DC-05 a never published draft with create access is discarded (' . DcLog::text() . ')' );
+eZContentObject::$editAccess = true;
+eZContentObject::$draftCreateAccess = null;
+
+// DC-06
+dcDiscard( false );
+eZHTTPTool::$session['RedirectIfDiscarded'] = 'https://elsewhere.example/';
+$module = dcRun();
+dcCheck( DcLog::has( 'versionRemoved' ) && DcLog::has( 'returnURI:https://elsewhere.example/' )
+         && $module->redirect === '/content/view/full/60/' && !array_key_exists( 'RedirectIfDiscarded', eZHTTPTool::$session ),
+         'DC-06 RedirectIfDiscarded to another host is refused, the object is shown instead (' . $module->redirect . ')' );
+dcDiscard( false );
+eZHTTPTool::$session['RedirectIfDiscarded'] = '/content/view/full/77';
+$module = dcRun();
+dcCheck( $module->redirect === '/content/view/full/77', 'DC-06 RedirectIfDiscarded inside the site is followed' );
 
 echo $failures ? "FAIL: $failures\n" : "PASS: all\n";
 exit( $failures ? 1 : 0 );

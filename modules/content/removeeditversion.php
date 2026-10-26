@@ -54,18 +54,27 @@ if ( $isConfirmed )
     if ( is_object( $versionObject ) and
          in_array( $versionObject->attribute( 'status' ), array( eZContentObjectVersion::STATUS_DRAFT, eZContentObjectVersion::STATUS_INTERNAL_DRAFT ) ) )
     {
-        if ( !$object->attribute( 'can_edit' ) )
+        // The kernel's edit check for this very version (editAccess(): the edit policy and the rules for another
+        // user's draft), and for an object that was never published the create access under the parent of its
+        // main node assignment (draftCreateAccess()), as the kernel's content/removeeditversion does. A kernel
+        // without them: can_edit as before, and the first version rule without a fatal error when the object
+        // has no node assignment.
+        if ( method_exists( $object, 'editAccess' ) )
+            $allowEdit = (bool)$object->editAccess( $versionObject );
+        else
+            $allowEdit = (bool)$object->attribute( 'can_edit' );
+
+        if ( !$allowEdit )
         {
-            // Check if it is a first created version of an object.
-            // If so, then edit is allowed if we have an access to the 'create' function.
-            if ( $object->attribute( 'current_version' ) == 1 && !$object->attribute( 'status' ) )
+            if ( method_exists( $object, 'draftCreateAccess' ) )
+                $allowEdit = (bool)$object->draftCreateAccess();
+            else if ( $object->attribute( 'current_version' ) == 1 && !$object->attribute( 'status' ) )
             {
                 $mainNode = eZNodeAssignment::fetchForObject( $object->attribute( 'id' ), 1 );
-                $parentObj = $mainNode[0]->attribute( 'parent_contentobject' );
-                $allowEdit = $parentObj->checkAccess( 'create', $object->attribute( 'contentclass_id' ), $parentObj->attribute( 'contentclass_id' ) );
+                $parentObj = isset( $mainNode[0] ) ? $mainNode[0]->attribute( 'parent_contentobject' ) : null;
+                $allowEdit = $parentObj instanceof eZContentObject
+                             && $parentObj->checkAccess( 'create', $object->attribute( 'contentclass_id' ), $parentObj->attribute( 'contentclass_id' ) );
             }
-            else
-                $allowEdit = false;
 
             if ( !$allowEdit )
             {
@@ -84,9 +93,20 @@ if ( $isConfirmed )
     $hasRedirected = false;
     if ( $http->hasSessionVariable( 'RedirectIfDiscarded' ) )
     {
-        $Module->redirectTo( $http->sessionVariable( 'RedirectIfDiscarded' ) );
+        // The page comes from the edit form (a posted RedirectIfDiscarded), so it is only followed when it passes
+        // the rules of eZRedirectManager::returnURI() (no other host, no script address); else the redirect below
+        // is used, as without one. A kernel without returnURI(): only a path inside the site.
+        $discardURI = $http->sessionVariable( 'RedirectIfDiscarded' );
         $http->removeSessionVariable( 'RedirectIfDiscarded' );
-        $hasRedirected = true;
+        if ( method_exists( 'eZRedirectManager', 'returnURI' ) )
+            $discardURI = eZRedirectManager::returnURI( $Module, false, $discardURI, array( 'session' => false ) );
+        else if ( !is_string( $discardURI ) || !preg_match( '#^/(?![/\\\\])[^\\x00-\\x20]*$#D', $discardURI ) )
+            $discardURI = false;
+        if ( $discardURI !== false && $discardURI !== '' )
+        {
+            $Module->redirectTo( $discardURI );
+            $hasRedirected = true;
+        }
     }
     if ( $http->hasSessionVariable( 'ParentObject' ) && $http->sessionVariable( 'NewObjectID' ) == $objectID )
     {
