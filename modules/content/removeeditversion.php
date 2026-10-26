@@ -20,6 +20,10 @@ if ( $http->hasPostVariable( "ConfirmButton" ) )
 if ( $http->hasSessionVariable( "DiscardConfirm" ) )
 {
     $discardConfirm = $http->sessionVariable( "DiscardConfirm" );
+    // The Discard action of content/edit sets the value for the redirect that follows, and it counts for that one
+    // only. Left in the session, any later GET of this view discarded the version in DiscardObjectID and
+    // DiscardObjectVersion without asking (a new draft can get the number of a discarded one).
+    $http->removeSessionVariable( "DiscardConfirm" );
     if ( !$discardConfirm )
         $isConfirmed = true;
 }
