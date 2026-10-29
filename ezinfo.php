@@ -11,7 +11,7 @@ class nxc_powercontentInfo {
 			'Name'      => 'NXC Powercontent',
 			'Version'   => '1.4.5',
 			'Author'    => '7x / SD / NXC International SA',
-			'Copyright' => 'Copyright 1999 - 2024 7x and 2010 <a href="http://nxc.no" target="blank">NXC Consulting</a>'
+			'Copyright' => 'Copyright (C) 1998 - 2026 Exponential Foundation and 7x. All rights reserved. Copyright 2010 <a href="http://nxc.no" target="blank">NXC Consulting</a>'
 		);
 	}
 }
