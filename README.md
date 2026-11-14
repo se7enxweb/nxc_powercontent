@@ -14,3 +14,7 @@ The key features are:
 Tutorials
 ---------
 - [Manipulating ez publish content in PHP](http://blog.nxcgroup.com/2012/manipulating-ez-publish-content-in-php/)
+
+Changes
+-------
+See [CHANGELOG.md](CHANGELOG.md).
